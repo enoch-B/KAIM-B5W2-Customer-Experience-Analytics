@@ -1,0 +1,91 @@
+name: CI/CD Pipeline for Fintech App Reviews
+
+on:
+  push:
+    branches:
+      - main
+      - task-1
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  lint-test:
+    name: Lint and Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+      
+      - name: Lint with flake8
+        run: |
+          pip install flake8
+          flake8 scripts/
+
+      - name: Run Unit Tests
+        run: |
+          pytest tests/
+
+  data-processing:
+    name: Data Processing
+    needs: lint-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+      
+      - name: Run Data Scraping
+        run: python scripts/scraping/play_store_scraper.py
+
+      - name: Run Data Cleaning
+        run: python scripts/preprocessing/data_cleaner.py
+
+      - name: Upload Cleaned Data Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: bank_reviews_clean
+          path: data/processed/
+
+  deployment:
+    name: Deploy Processed Data
+    needs: data-processing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+      
+      - name: Download Cleaned Data
+        uses: actions/download-artifact@v3
+        with:
+          name: bank_reviews_clean
+          path: data/processed/
+
+      - name: Upload to Database
+        run: python scripts/database/db_insert.py

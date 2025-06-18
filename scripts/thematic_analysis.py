@@ -1,50 +1,51 @@
-# thematic_analysis.py
-
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-def load_data(filepath):
-    return pd.read_csv(filepath)
+# Load preprocessed sentiment-labeled reviews
+df = pd.read_csv("../data/analyzed/sentiment_results.csv")  # Adjust path as needed
 
-def extract_keywords(df, max_features=50):
-    tfidf = TfidfVectorizer(ngram_range=(1,2), max_features=max_features, stop_words='english')
-    tfidf_matrix = tfidf.fit_transform(df['review'].astype(str))
-    keywords = tfidf.get_feature_names_out()
-    return keywords
+# Handle missing or non-string review values safely
+df['review'] = df['review'].fillna('').astype(str)
 
+
+# --- THEME ASSIGNMENT FUNCTION ---
 def assign_theme(text):
-    text = text.lower()
-    if any(kw in text for kw in ["login", "sign in", "authentication"]):
-        return "Login Issues"
-    elif any(kw in text for kw in ["slow", "lag", "not load", "freeze", "crash"]):
-        return "Performance"
-    elif any(kw in text for kw in ["interface", "ui", "design", "layout"]):
-        return "UI/UX"
-    elif any(kw in text for kw in ["feature", "add", "include", "tool"]):
-        return "Feature Requests"
-    elif any(kw in text for kw in ["support", "help", "customer"]):
-        return "Customer Support"
-    else:
-        return "Other"
-
-def add_theme_column(df):
-    df['theme'] = df['review'].apply(assign_theme)
-    return df
-
-def save_keywords(keywords, path="keywords.csv"):
-    pd.DataFrame(keywords, columns=["keyword"]).to_csv(path, index=False)
-    print(f"Saved keywords to {path}")
-
-def save_results(df, path="sentiment_results.csv"):
-    df.to_csv(path, index=False)
-    print(f"Updated file with themes saved to {path}")
-
-if __name__ == "__main__":
-    input_file = "sentiment_results.csv"
-    df = load_data(input_file)
+    if not isinstance(text, str):
+        return 'unknown'
     
-    keywords = extract_keywords(df)
-    save_keywords(keywords)
+    text = text.lower()
 
-    df = add_theme_column(df)
-    save_results(df)
+    if any(keyword in text for keyword in ['login', 'password', 'sign in']):
+        return 'Login Issues'
+    elif any(keyword in text for keyword in ['slow', 'lag', 'load', 'freeze']):
+        return 'Performance & Speed'
+    elif any(keyword in text for keyword in ['crash', 'bug', 'error', 'glitch']):
+        return 'Stability & Reliability'
+    elif any(keyword in text for keyword in ['fingerprint', 'feature', 'option', 'function']):
+        return 'Feature Requests'
+    elif any(keyword in text for keyword in ['support', 'help', 'service', 'agent']):
+        return 'Customer Support'
+    elif any(keyword in text for keyword in ['interface', 'ui', 'design', 'layout']):
+        return 'UI/UX'
+    else:
+        return 'Other'
+
+
+# Assign theme based on review text
+df['theme'] = df['review'].apply(assign_theme)
+
+
+# --- TF-IDF Keyword Extraction ---
+vectorizer = TfidfVectorizer(stop_words='english', max_features=20)
+X = vectorizer.fit_transform(df['review'])
+
+# Save top keywords
+keywords = vectorizer.get_feature_names_out()
+keyword_df = pd.DataFrame(keywords, columns=['keyword'])
+keyword_df.to_csv("../data/analyzed/keywords.csv", index=False)
+print("✅ Saved top keywords to keywords.csv")
+
+
+# Save updated dataset with theme
+df.to_csv("../data/analyzed/themed_reviews.csv", index=False)
+print("✅ Saved reviews with themes to themed_reviews.csv")
